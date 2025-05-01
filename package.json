@@ -1,0 +1,17 @@
+{
+  "name": "pr3.2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "websocket_server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^6.16.0",
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0",
+    "ws": "^8.18.1"
+  }
+}
