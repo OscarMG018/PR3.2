@@ -1,62 +1,68 @@
 const WebSocket = require('ws');
 const readline = require('readline');
 
-const SERVER_URL = 'ws://localhost:8080'; // URL del servidor WebSocket
+const SERVER_URL = 'ws://localhost:8080';
 
 console.log(`Intentant connectar a ${SERVER_URL}...`);
 const ws = new WebSocket(SERVER_URL);
 
-let position = { x: 0, y: 0 }; // Posició inicial del jugador
+// *** NOU: Guardem la posició que ens diu el servidor ***
+let currentPosition = { x: 0, y: 0 }; // Valor inicial per defecte
+
+function displayPosition() {
+     // Neteja la línia actual i mostra la posició i el prompt
+     process.stdout.write('\r' + ' '.repeat(process.stdout.columns) + '\r'); // Neteja línia
+     process.stdout.write(`Posició actual: (${currentPosition.x}, ${currentPosition.y}) | Mou amb fletxes (CTRL+C surt): `);
+}
 
 ws.on('open', () => {
     console.log('Connectat al servidor WebSocket!');
     console.log('Mou el jugador amb les tecles de fletxa.');
     console.log('Prem CTRL+C per sortir.');
-    console.log(`Posició inicial: (${position.x}, ${position.y})`);
+    // No mostrem la posició inicial aquí, esperem el missatge del servidor
 
-    // Configura readline per capturar tecles
     readline.emitKeypressEvents(process.stdin);
-    if (process.stdin.isTTY) { // Només si s'executa en una terminal interactiva
+    if (process.stdin.isTTY) {
         process.stdin.setRawMode(true);
     }
 
     process.stdin.on('keypress', (str, key) => {
-        // Surt amb CTRL+C
         if (key.ctrl && key.name === 'c') {
             console.log("\nDesconnectant...");
             ws.close();
-            process.exit();
+            // setRawMode(false) es farà a l'event 'close'
+            return; // Surt del handler
         }
 
-        let moved = false;
+        let command = null;
         switch (key.name) {
             case 'up':
-                position.y -= 1;
-                moved = true;
+                command = 'up';
                 break;
             case 'down':
-                position.y += 1;
-                moved = true;
+                command = 'down';
                 break;
             case 'left':
-                position.x -= 1;
-                moved = true;
+                command = 'left';
                 break;
             case 'right':
-                position.x += 1;
-                moved = true;
+                command = 'right';
                 break;
         }
 
-        // Si s'ha mogut, envia la nova posició
-        if (moved) {
-            console.log(`Nova posició: (${position.x}, ${position.y})`);
+        // Si s'ha premut una tecla de moviment vàlida, envia la comanda
+        if (command) {
             try {
-                ws.send(JSON.stringify(position));
+                 // *** NOU: Envia la comanda enlloc de la posició ***
+                 console.log(`\nEnviant comanda: ${command}`) // Log per debug
+                ws.send(JSON.stringify({ command: command }));
+                // No actualitzem la posició localment, esperem la resposta del servidor
             } catch (error) {
-                console.error('Error enviant missatge:', error);
-                // Podriem intentar reconectar o simplement informar
+                console.error('\nError enviant comanda:', error);
             }
+        } else {
+             // Si es prem una tecla que no és de moviment, tornem a mostrar el prompt
+             displayPosition();
         }
     });
 });
@@ -64,40 +70,72 @@ ws.on('open', () => {
 ws.on('message', (message) => {
     try {
         const data = JSON.parse(message.toString());
-        console.log("\nMissatge rebut del servidor:");
-        // Si és un missatge de partida finalitzada
-        if (data.type === 'gameOver') {
-            console.log(`   Partida ${data.gameId} finalitzada!`);
-            console.log(`   Distància recorreguda (línia recta): ${data.distance}`);
-            console.log(`   Inici: ${new Date(data.startTime).toLocaleTimeString()}, Fi: ${new Date(data.endTime).toLocaleTimeString()}`);
-            console.log("\nPots començar a moure't per iniciar una nova partida.");
-        } else if (data.type === 'error') {
-             console.warn(`   Error del servidor: ${data.message}`);
-        } else {
-            // Altres tipus de missatges (si n'hi hagués)
-            console.log('  ', data);
+        // Esborra la línia anterior abans d'escriure el nou missatge
+        process.stdout.write('\r' + ' '.repeat(process.stdout.columns) + '\r');
+
+        // *** NOU: Gestionar diferents tipus de missatges del servidor ***
+        switch (data.type) {
+            case 'initialState':
+                 console.log("Estat inicial rebut del servidor.");
+                 currentPosition.x = data.x;
+                 currentPosition.y = data.y;
+                 break;
+            case 'positionUpdate':
+                // console.log(`\nPosició actualitzada pel servidor: (${data.x}, ${data.y})`); // Log opcional
+                currentPosition.x = data.x;
+                currentPosition.y = data.y;
+                break;
+            case 'gameOver':
+                console.log(`\n--- PARTIDA FINALITZADA (Game ID: ${data.gameId}) ---`);
+                console.log(`   Distància (línia recta): ${data.distance}`);
+                console.log(`   Durada: ${new Date(data.startTime).toLocaleTimeString()} - ${new Date(data.endTime).toLocaleTimeString()}`);
+                console.log("--------------------------------------------------");
+                console.log("Pots començar a moure't per iniciar una nova partida.");
+                // La posició ja hauria d'haver estat resetejada pel servidor amb un 'positionUpdate' posterior
+                break;
+            case 'error':
+                console.warn(`\nError del servidor: ${data.message}`);
+                break;
+            default:
+                console.log('\nMissatge desconegut rebut del servidor:', data);
         }
     } catch (error) {
         console.error('\nError processant missatge del servidor:', error);
         console.log('Missatge rebut (raw):', message.toString());
     }
-     // Torna a mostrar el prompt per a l'usuari després de rebre un missatge
-     process.stdout.write('Mou el jugador amb les tecles de fletxa (CTRL+C per sortir): ');
+    // *** NOU: Mostra la posició actualitzada i el prompt ***
+    displayPosition();
 });
 
 ws.on('close', (code, reason) => {
-    console.log(`\nConnexió tancada. Codi: ${code}, Motiu: ${reason ? reason.toString() : 'Sense motiu'}`);
-     if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false); // Restaura el mode normal de la terminal
+    // Intenta restaurar el mode de la terminal abans de sortir
+    try {
+        if (process.stdin.isTTY) {
+            process.stdin.setRawMode(false);
+        }
+    } catch (e) {
+        // Ignora errors si la terminal ja no està disponible
     }
-    process.exit(0); // Surt del procés client
+    console.log(`\nConnexió tancada. Codi: ${code}, Motiu: ${reason ? reason.toString() : 'Sense motiu'}`);
+    process.exit(0);
 });
 
 ws.on('error', (error) => {
-    console.error('Error de WebSocket:', error.message);
-    console.error('No s\'ha pogut connectar al servidor. Assegura\'t que està funcionant a ' + SERVER_URL);
-    if (process.stdin.isTTY) {
-       process.stdin.setRawMode(false); // Restaura per si de cas
-   }
-    process.exit(1); // Surt amb error
+    try {
+        if (process.stdin.isTTY) {
+           process.stdin.setRawMode(false);
+       }
+    } catch(e) {}
+    console.error('\nError de WebSocket:', error.message);
+    if (error.code === 'ECONNREFUSED') {
+         console.error(`No s'ha pogut connectar a ${SERVER_URL}. Assegura't que el servidor està funcionant.`);
+    }
+    process.exit(1);
+});
+
+// Captura SIGINT (Ctrl+C) per assegurar que rawMode es desactiva
+process.on('SIGINT', () => {
+    console.log('\nRebut SIGINT, tancant...');
+    ws.close();
+    // El 'close' event hauria de gestionar la sortida i rawMode
 });
