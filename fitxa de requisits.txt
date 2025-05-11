@@ -1,0 +1,45 @@
+# Fitxa de Requisits: Mini-Servidor WebSocket de Registre moviments de Joc
+
+## 1. Descripció General
+Aquest projecte consisteix en la implementació d'un sistema client-servidor basat en WebSockets per registrar els moviments d'un
+jugador en un espai 2D. El sistema emmagatzemarà cada moviment en una base de dades MongoDB i calcularà la distancia recorreguda 
+al final de la partida.
+
+## 2. Requisits Funcionals
+
+### 2.1. Servidor WebSocket
+- **RF1.1:** El servidor s'iniciarà en un port i escoltarà connexions WebSocket entrants.
+- **RF1.2:** El servidor acceptarà múltiples connexions simultànies de clients.
+- **RF1.3:** El servidor rebrà missatges en format JSON que contindran la informació de direccio del jugador.
+- **RF1.4:** El servidor emmagatzemarà cada moviment rebut a MongoDB com un registre de moviments.
+- **RF1.5:** El servidor associarà els moviments a una mateixa partida mentre el jugador estigui en moviment continu.
+- **RF1.6:** El servidor detectarà quan un jugador ha estat inactiu durant 10 segons i marcarà la partida com a finalitzada.
+- **RF1.7:** El servidor calcularà la distància en línia recta entre la posició inicial i final de la partida.
+- **RF1.8:** El servidor informarà al client quan una partida finalitzi, enviant la distància calculada.
+- **RF1.9:** El servidor implementarà un sistema de logs tant en pantalla com en fitxer.
+
+### 2.2. Client WebSocket
+- **RF2.1:** El client establirà una connexió WebSocket amb el servidor.
+- **RF2.2:** El client detectarà les pulsacions de tecles de direcció (fletxes) per moure el jugador.
+- **RF2.3:** El client enviarà al servidor un missatge JSON amb la direcció en la qual el jugador es vol moure.
+- **RF2.4:** El client rebrà i mostrarà els missatges del servidor, especialment la informació de finalització de partida.
+
+### 2.3. Gestió de Partides
+- **RF3.1:** Una partida comença amb el primer moviment del jugador.
+- **RF3.2:** Els moviments consecutius amb menys de 10 segons d'interval pertanyen a la mateixa partida.
+- **RF3.3:** Una partida finalitza quan passen 10 segons sense moviment.
+- **RF3.4:** En finalitzar una partida, es calcula la distància en línia recta entre el punt inicial i final.
+
+## 3. Requisits No Funcionals
+
+### 3.1. Tecnològics
+- **RNF1.1:** Utilitzar Node.js com a plataforma de desenvolupament.
+- **RNF1.2:** Utilitzar la biblioteca 'ws' per implementar WebSockets.
+- **RNF1.3:** Utilitzar MongoDB com a base de dades per emmagatzemar els moviments.
+- **RNF1.4:** Utilitzar el driver oficial de MongoDB per Node.js (mongodb).
+- **RNF1.5:** Utilitzar la biblioteca Winston per a la gestió de logs.
+
+### 3.2. Gestió de errors i excepcions
+- **RNF3.1:** El sistema ha de gestionar correctament les connexions i desconnexions.
+- **RNF3.2:** El sistema ha de gestionar errors sense interrompre el servei.
+- **RNF3.3:** Els logs han de proporcionar informació suficient per a la diagnosi de problemes.
